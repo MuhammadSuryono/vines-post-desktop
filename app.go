@@ -3,8 +3,11 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
+	"time"
 	"vines-pos-desktop/printer"
 )
 
@@ -18,6 +21,44 @@ type App struct {
 func NewApp(config AppConfig) *App {
 	return &App{
 		config: config,
+	}
+}
+
+type GitHubRelease struct {
+	TagName string `json:"tag_name"`
+	Name    string `json:"name"`
+	HTMLURL string `json:"html_url"`
+}
+
+// CheckUpdate membandingkan versi lokal dengan rilis terbaru di GitHub
+func (a *App) CheckUpdate() map[string]interface{} {
+	client := &http.Client{Timeout: 5 * time.Second}
+	// Ganti dengan URL repo Anda
+	url := "https://api.github.com/repos/MuhammadSuryono/vines-post-desktop/releases/latest"
+	
+	resp, err := client.Get(url)
+	if err != nil {
+		return map[string]interface{}{"update_available": false, "error": err.Error()}
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return map[string]interface{}{"update_available": false, "status": resp.Status}
+	}
+
+	var release GitHubRelease
+	if err := json.NewDecoder(resp.Body).Decode(&release); err != nil {
+		return map[string]interface{}{"update_available": false, "error": "Failed to decode JSON"}
+	}
+
+	// Bandingkan: Jika Tag di GitHub (misal v1.0.1) != Versi Lokal
+	updateAvailable := release.TagName != "v"+a.config.Version && release.TagName != a.config.Version
+	
+	return map[string]interface{}{
+		"update_available": updateAvailable,
+		"latest_version":   release.TagName,
+		"current_version":  a.config.Version,
+		"url":              release.HTMLURL,
 	}
 }
 
