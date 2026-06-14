@@ -49,11 +49,12 @@ func (a *App) ShowUpdatePrompt(version string, url string) {
 		Type:          runtime.QuestionDialog,
 		Title:         "Update Tersedia",
 		Message:       msg,
-		DefaultButton: "Ya",
-		CancelButton:  "Nanti",
+		DefaultButton: "Yes",
+		CancelButton:  "No",
+		Buttons:       []string{"Yes", "No"},
 	})
 
-	if err == nil && result == "Ya" {
+	if err == nil && result == "Yes" {
 		runtime.BrowserOpenURL(a.ctx, url)
 	}
 }

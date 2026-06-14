@@ -62,8 +62,8 @@ func main() {
 	// Menu Pengaturan
 	SettingsMenu := AppMenu.AddSubmenu("Pengaturan")
 	SettingsMenu.AddText("Ubah URL Server", keys.CmdOrCtrl("u"), func(_ *menu.CallbackData) {
-		// Paksa kembali ke halaman pengaturan lokal
-		runtime.WindowExecJS(app.ctx, "window.location.href = '/'")
+		// Panggil fungsi global di frontend untuk menampilkan modal/halaman settings
+		runtime.WindowExecJS(app.ctx, "if(window.showSettingsUI) { window.showSettingsUI(); } else { window.location.href = '/'; }")
 	})
 
 	// Menu Aplikasi

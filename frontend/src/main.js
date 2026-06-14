@@ -67,9 +67,6 @@ function showSettingsUI() {
             return;
         }
         
-        // Memastikan index.php ada jika tidak diinput user (opsional, tergantung kebutuhan user)
-        // if (!newURL.includes('index.php')) { ... }
-
         SaveURL(newURL).then(res => {
             if (res === "Success") {
                 location.reload();
@@ -79,6 +76,9 @@ function showSettingsUI() {
         });
     };
 }
+
+// Ekspos ke window agar bisa dipanggil dari Go (Menu Bar)
+window.showSettingsUI = showSettingsUI;
 
 // Start
 showLoadingUI();
