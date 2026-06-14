@@ -75,6 +75,18 @@ func main() {
 			Message: "Vines POS Desktop v" + config.Version + "\nSolusi Kasir Terintegrasi",
 		})
 	})
+	AppSubMenu.AddText("Cek Pembaruan", nil, func(_ *menu.CallbackData) {
+		result := app.CheckUpdate()
+		if val, ok := result["update_available"].(bool); ok && val {
+			app.ShowUpdatePrompt(result["latest_version"].(string), result["url"].(string))
+		} else {
+			runtime.MessageDialog(app.ctx, runtime.MessageDialogOptions{
+				Type:    runtime.InfoDialog,
+				Title:   "Cek Pembaruan",
+				Message: "Aplikasi sudah mutakhir (v" + config.Version + ")",
+			})
+		}
+	})
 	AppSubMenu.AddSeparator()
 	AppSubMenu.AddText("Keluar", keys.CmdOrCtrl("q"), func(_ *menu.CallbackData) {
 		runtime.Quit(app.ctx)
