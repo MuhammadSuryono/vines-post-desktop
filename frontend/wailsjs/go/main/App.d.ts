@@ -6,4 +6,6 @@ export function CheckUpdate():Promise<Record<string, any>>;
 
 export function PrintReceipt(arg1:main.PrinterLine):Promise<string>;
 
+export function ShowUpdatePrompt(arg1:string,arg2:string):Promise<void>;
+
 export function TestPrint(arg1:string):Promise<string>;

@@ -1,5 +1,4 @@
-import {CheckUpdate} from '../wailsjs/go/main/App';
-import {BrowserOpenURL} from '../wailsjs/runtime/runtime';
+import {CheckUpdate, ShowUpdatePrompt} from '../wailsjs/go/main/App';
 import logo from './assets/images/logo-universal.png';
 
 const remoteURL = "http://45.64.97.50:888/thevines/index.php";
@@ -46,22 +45,12 @@ document.querySelector('#app').innerHTML = `
     </div>
 `;
 
-// Pengecekan Update
+// Pengecekan Update Native
 function doCheckUpdate() {
     CheckUpdate().then(result => {
         if (result.update_available) {
-            const updateDiv = document.createElement('div');
-            updateDiv.style = "position: fixed; top: 10px; right: 10px; background: #FFF3CD; border: 1px solid #FFEEBA; padding: 15px; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 9999; font-size: 13px; color: #856404;";
-            updateDiv.innerHTML = `
-                <div style="font-weight: bold; margin-bottom: 5px;">Update Tersedia! (${result.latest_version})</div>
-                <div style="margin-bottom: 10px;">Versi Anda: ${result.current_version}</div>
-                <span style="text-decoration: underline; cursor: pointer; color: #007BFF; font-weight: bold;" id="download-btn">Download Sekarang</span>
-                <span style="margin-left: 15px; cursor: pointer; color: #666; text-decoration: underline;" onclick="this.parentElement.remove()">Nanti Saja</span>
-            `;
-            document.body.appendChild(updateDiv);
-            document.getElementById('download-btn').onclick = () => {
-                BrowserOpenURL(result.url);
-            };
+            // Panggil fungsi Go untuk memunculkan Popup Native OS
+            ShowUpdatePrompt(result.latest_version, result.url);
         }
     }).catch(err => console.error("Update check failed:", err));
 }

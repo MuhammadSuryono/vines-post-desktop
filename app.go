@@ -1,5 +1,4 @@
 package main
-
 import (
 	"bufio"
 	"context"
@@ -9,6 +8,8 @@ import (
 	"os"
 	"time"
 	"vines-pos-desktop/printer"
+
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // App struct
@@ -21,6 +22,23 @@ type App struct {
 func NewApp(config AppConfig) *App {
 	return &App{
 		config: config,
+	}
+}
+
+// ShowUpdatePrompt memunculkan dialog native OS agar tidak hilang saat redirect web
+func (a *App) ShowUpdatePrompt(version string, url string) {
+	msg := fmt.Sprintf("Versi baru (%s) telah tersedia.\nApakah Anda ingin mendownloadnya sekarang?", version)
+
+	result, err := runtime.MessageDialog(a.ctx, runtime.MessageDialogOptions{
+		Type:          runtime.QuestionDialog,
+		Title:         "Update Tersedia",
+		Message:       msg,
+		DefaultButton: "Ya",
+		CancelButton:  "Nanti",
+	})
+
+	if err == nil && result == "Ya" {
+		runtime.BrowserOpenURL(a.ctx, url)
 	}
 }
 
