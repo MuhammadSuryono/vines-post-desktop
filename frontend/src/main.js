@@ -69,8 +69,8 @@ function showSettingsUI() {
         
         SaveURL(newURL).then(res => {
             if (res === "Success") {
-                // Gunakan URL internal Wails untuk reset state JS
-                window.location.assign(newURL);
+                // Reload ke root agar muncul loading UI dulu sebelum redirect
+                window.location.href = '/';
             } else {
                 alert("Gagal menyimpan: " + res);
             }

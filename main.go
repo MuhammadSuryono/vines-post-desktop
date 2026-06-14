@@ -68,8 +68,8 @@ func main() {
 		app.config.RemoteURL = ""
 		// 2. Simpan ke config.json agar permanen
 		app.config.Save()
-		// 3. Paksa reload ke UI lokal dengan flag reset
-		runtime.WindowExecJS(app.ctx, "window.location.href = 'http://wails.localhost/?reset=1'")
+		// 3. Paksa reload ke UI lokal
+		runtime.WindowReloadApp(app.ctx)
 	})
 
 	// Menu Aplikasi
