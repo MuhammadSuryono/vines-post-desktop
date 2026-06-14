@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"os"
 	"vines-pos-desktop/printer"
-
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // App struct
@@ -31,10 +29,8 @@ func (a *App) startup(ctx context.Context) {
 
 // domReady is called when the frontend has loaded its initial assets
 func (a *App) domReady(ctx context.Context) {
-	if a.config.Mode == "remote" && a.config.RemoteURL != "" {
-		fmt.Printf("Redirecting to: %s\n", a.config.RemoteURL)
-		runtime.WindowExecJS(ctx, fmt.Sprintf("window.location.href = '%s';", a.config.RemoteURL))
-	}
+	// Logika redirect dipindahkan sepenuhnya ke frontend (main.js)
+	// untuk menghindari infinite loop saat halaman remote dimuat.
 }
 
 // Printer Data Structures
