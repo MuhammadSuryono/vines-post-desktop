@@ -53,7 +53,7 @@ function showSettingsUI() {
                 
                 ${currentConfig?.remote_url ? `
                     <div style="margin-top: 20px;">
-                        <span class="manual-link" onclick="location.reload()">Batal & Kembali</span>
+                        <span class="manual-link" onclick="window.location.reload()">Batal & Kembali</span>
                     </div>
                 ` : ''}
             </div>
@@ -69,7 +69,8 @@ function showSettingsUI() {
         
         SaveURL(newURL).then(res => {
             if (res === "Success") {
-                location.reload();
+                // Gunakan URL internal Wails untuk reset state JS
+                window.location.assign(newURL);
             } else {
                 alert("Gagal menyimpan: " + res);
             }

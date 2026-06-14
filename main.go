@@ -62,11 +62,9 @@ func main() {
 	// Menu Pengaturan
 	SettingsMenu := AppMenu.AddSubmenu("Pengaturan")
 	SettingsMenu.AddText("Ubah URL Server", keys.CmdOrCtrl("u"), func(_ *menu.CallbackData) {
-		// 1. Kosongkan URL di memori dan file config.json
-		app.config.RemoteURL = ""
-		app.config.Save()
-		// 2. Restart/Reload aplikasi agar kembali ke halaman input awal
-		runtime.WindowReload(app.ctx)
+		// Paksa kembali ke UI lokal (Wails assets)
+		// Kita gunakan path absolut internal Wails agar tidak terpengaruh domain remote
+		runtime.WindowExecJS(app.ctx, "window.location.href = 'http://wails.localhost/'")
 	})
 
 	// Menu Aplikasi
