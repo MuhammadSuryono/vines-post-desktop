@@ -119,11 +119,15 @@ func (a *App) StartUpdate(release GitHubRelease) {
 		return
 	}
 
-	// 4. Restart aplikasi
+	// 4. Update versi di config.json sebelum restart
+	a.config.Version = strings.TrimPrefix(release.TagName, "v")
+	a.config.Save()
+
+	// 5. Restart aplikasi
 	runtime.MessageDialog(a.ctx, runtime.MessageDialogOptions{
 		Type:    runtime.InfoDialog,
 		Title:   "Update Berhasil",
-		Message: "Update telah terpasang. Aplikasi akan dimulai ulang sekarang.",
+		Message: "Update telah terpasang ke versi " + release.TagName + ". Aplikasi akan dimulai ulang sekarang.",
 	})
 
 	self, err := os.Executable()

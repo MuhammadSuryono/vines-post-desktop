@@ -22,6 +22,10 @@ export function ShowUpdatePrompt(arg1, arg2) {
   return window['go']['main']['App']['ShowUpdatePrompt'](arg1, arg2);
 }
 
+export function StartUpdate(arg1) {
+  return window['go']['main']['App']['StartUpdate'](arg1);
+}
+
 export function TestPrint(arg1) {
   return window['go']['main']['App']['TestPrint'](arg1);
 }
