@@ -11,6 +11,7 @@ import (
 	"github.com/wailsapp/wails/v2/pkg/menu/keys"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+	"github.com/wailsapp/wails/v2/pkg/options/mac"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -54,7 +55,8 @@ func (c *AppConfig) Save() error {
 
 func main() {
 	config := loadConfig()
-	app := NewApp(config)
+	// Gunakan pointer agar perubahan di menu bar langsung terbaca di backend binding
+	app := NewApp(&config)
 
 	// Membuat Menu Bar Desktop Native
 	AppMenu := menu.NewMenu()
@@ -62,9 +64,12 @@ func main() {
 	// Menu Pengaturan
 	SettingsMenu := AppMenu.AddSubmenu("Pengaturan")
 	SettingsMenu.AddText("Ubah URL Server", keys.CmdOrCtrl("u"), func(_ *menu.CallbackData) {
-		// Paksa kembali ke UI lokal (Wails assets)
-		// Kita gunakan path absolut internal Wails agar tidak terpengaruh domain remote
-		runtime.WindowExecJS(app.ctx, "window.location.href = 'http://wails.localhost/'")
+		// 1. Kosongkan URL di memori
+		app.config.RemoteURL = ""
+		// 2. Simpan ke config.json agar permanen
+		app.config.Save()
+		// 3. Paksa reload ke UI lokal dengan flag reset
+		runtime.WindowExecJS(app.ctx, "window.location.href = 'http://wails.localhost/?reset=1'")
 	})
 
 	// Menu Aplikasi
@@ -95,7 +100,7 @@ func main() {
 
 	// Base App Options
 	appOptions := &options.App{
-		Title:  "Vines POS Desktop (v" + config.Version + ")",
+		Title:  "Vines POS",
 		Width:  1280,
 		Height: 800,
 		AssetServer: &assetserver.Options{
@@ -104,9 +109,16 @@ func main() {
 		BackgroundColour: &options.RGBA{R: 255, G: 255, B: 255, A: 1},
 		OnStartup:        app.startup,
 		OnDomReady:       app.domReady,
-		Menu:             AppMenu, // Pasang menu ke aplikasi
+		Menu:             AppMenu,
 		Bind: []interface{}{
 			app,
+		},
+		// Khusus MacOS untuk menghapus sisa branding Wails
+		Mac: &mac.Options{
+			About: &mac.AboutInfo{
+				Title:   "Vines POS",
+				Message: "© 2026 Vines POS\nSolusi Kasir Terintegrasi",
+			},
 		},
 	}
 

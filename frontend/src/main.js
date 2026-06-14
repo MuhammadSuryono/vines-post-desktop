@@ -80,24 +80,31 @@ function showSettingsUI() {
 
 // Ekspos ke window agar bisa dipanggil dari Go (Menu Bar)
 window.showSettingsUI = showSettingsUI;
-
-// Start
+// Main Execution
 showLoadingUI();
+
+const urlParams = new URLSearchParams(window.location.search);
+const forceReset = urlParams.get('reset') === '1';
 
 GetConfig().then(config => {
     currentConfig = config;
-    
-    // Check update in background
+
+    // 1. Cek Update di background
     CheckUpdate().then(result => {
         if (result.update_available) ShowUpdatePrompt(result.latest_version, result.url);
     });
 
-    if (!config.remote_url) {
+    // 2. Logika Redirect
+    if (!config.remote_url || forceReset) {
         showSettingsUI();
     } else {
-        // Berikan waktu sedikit agar user bisa klik "Settings" jika mau
         setTimeout(() => {
+            // Munculkan opsi settings jika loading kelamaan
+            setTimeout(() => {
+                const retry = document.getElementById('retry-area');
+                if(retry) retry.style.display = 'block';
+            }, 4000);
             window.location.assign(config.remote_url);
-        }, 1500);
+        }, 500);
     }
 });

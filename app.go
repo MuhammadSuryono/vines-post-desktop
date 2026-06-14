@@ -16,11 +16,11 @@ import (
 // App struct
 type App struct {
 	ctx    context.Context
-	config AppConfig
+	config *AppConfig
 }
 
 // NewApp creates a new App application struct
-func NewApp(config AppConfig) *App {
+func NewApp(config *AppConfig) *App {
 	return &App{
 		config: config,
 	}
@@ -28,7 +28,7 @@ func NewApp(config AppConfig) *App {
 
 // GetConfig mengembalikan konfigurasi saat ini ke frontend
 func (a *App) GetConfig() AppConfig {
-	return a.config
+	return *a.config
 }
 
 // SaveURL menyimpan URL baru ke dalam file config.json
