@@ -7,8 +7,11 @@ import (
 	"path/filepath"
 
 	"github.com/wailsapp/wails/v2"
+	"github.com/wailsapp/wails/v2/pkg/menu"
+	"github.com/wailsapp/wails/v2/pkg/menu/keys"
 	"github.com/wailsapp/wails/v2/pkg/options"
 	"github.com/wailsapp/wails/v2/pkg/options/assetserver"
+	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 //go:embed all:frontend/dist
@@ -53,6 +56,30 @@ func main() {
 	config := loadConfig()
 	app := NewApp(config)
 
+	// Membuat Menu Bar Desktop Native
+	AppMenu := menu.NewMenu()
+
+	// Menu Pengaturan
+	SettingsMenu := AppMenu.AddSubmenu("Pengaturan")
+	SettingsMenu.AddText("Ubah URL Server", keys.CmdOrCtrl("u"), func(_ *menu.CallbackData) {
+		// Paksa kembali ke halaman pengaturan lokal
+		runtime.WindowExecJS(app.ctx, "window.location.href = '/'")
+	})
+
+	// Menu Aplikasi
+	AppSubMenu := AppMenu.AddSubmenu("Aplikasi")
+	AppSubMenu.AddText("Tentang Vines POS", nil, func(_ *menu.CallbackData) {
+		runtime.MessageDialog(app.ctx, runtime.MessageDialogOptions{
+			Type:    runtime.InfoDialog,
+			Title:   "Vines POS",
+			Message: "Vines POS Desktop v" + config.Version + "\nSolusi Kasir Terintegrasi",
+		})
+	})
+	AppSubMenu.AddSeparator()
+	AppSubMenu.AddText("Keluar", keys.CmdOrCtrl("q"), func(_ *menu.CallbackData) {
+		runtime.Quit(app.ctx)
+	})
+
 	// Base App Options
 	appOptions := &options.App{
 		Title:  "Vines POS Desktop (v" + config.Version + ")",
@@ -64,6 +91,7 @@ func main() {
 		BackgroundColour: &options.RGBA{R: 255, G: 255, B: 255, A: 1},
 		OnStartup:        app.startup,
 		OnDomReady:       app.domReady,
+		Menu:             AppMenu, // Pasang menu ke aplikasi
 		Bind: []interface{}{
 			app,
 		},
