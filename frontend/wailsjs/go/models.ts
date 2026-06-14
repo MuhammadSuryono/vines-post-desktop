@@ -1,5 +1,21 @@
 export namespace main {
 	
+	export class AppConfig {
+	    mode: string;
+	    remote_url: string;
+	    version: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new AppConfig(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.mode = source["mode"];
+	        this.remote_url = source["remote_url"];
+	        this.version = source["version"];
+	    }
+	}
 	export class HeaderLine {
 	    header: string;
 	    address: string;

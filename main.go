@@ -21,30 +21,36 @@ type AppConfig struct {
 	Version   string `json:"version"`    // Versi aplikasi desktop
 }
 
+func getConfigPath() string {
+	exePath, _ := os.Executable()
+	return filepath.Join(filepath.Dir(exePath), "config.json")
+}
+
 func loadConfig() AppConfig {
-	// 1. Konfigurasi Default (Remote)
+	// Default
 	config := AppConfig{
 		Mode:      "remote",
-		RemoteURL: "http://45.64.97.50:888/thevines/index.php",
+		RemoteURL: "", // Dikosongkan agar user diminta input pertama kali
 		Version:   "1.0.0",
 	}
 
-	// 2. Coba baca config.json di folder yang sama dengan executable
-	exePath, err := os.Executable()
+	data, err := os.ReadFile(getConfigPath())
 	if err == nil {
-		configPath := filepath.Join(filepath.Dir(exePath), "config.json")
-		data, err := os.ReadFile(configPath)
-		if err == nil {
-			// Jika file config.json ditemukan, timpa konfigurasi default
-			json.Unmarshal(data, &config)
-		}
+		json.Unmarshal(data, &config)
 	}
 	return config
 }
 
+func (c *AppConfig) Save() error {
+	data, err := json.MarshalIndent(c, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(getConfigPath(), data, 0644)
+}
+
 func main() {
 	config := loadConfig()
-	// Create an instance of the app structure
 	app := NewApp(config)
 
 	// Base App Options

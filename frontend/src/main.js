@@ -1,68 +1,82 @@
-import {CheckUpdate, ShowUpdatePrompt} from '../wailsjs/go/main/App';
+import {CheckUpdate, ShowUpdatePrompt, GetConfig, SaveURL} from '../wailsjs/go/main/App';
 import logo from './assets/images/logo-universal.png';
 
-const remoteURL = "http://45.64.97.50:888/thevines/index.php";
+let currentConfig = null;
 
-// Menambahkan style untuk spinner animasi langsung ke dalam halaman
+// CSS Styles
 const style = document.createElement('style');
 style.innerHTML = `
-    .spinner {
-        border: 4px solid rgba(0, 0, 0, 0.1);
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
-        border-left-color: #00CCFF;
-        animation: spin 1s linear infinite;
-        margin: 0 auto 20px auto;
-    }
-    @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-    }
-    .manual-link {
-        color: #007BFF;
-        text-decoration: underline;
-        cursor: pointer;
-        font-size: 14px;
-    }
-    .manual-link:hover {
-        color: #0056b3;
-    }
+    .spinner { border: 4px solid rgba(0, 0, 0, 0.1); width: 40px; height: 40px; border-radius: 50%; border-left-color: #00CCFF; animation: spin 1s linear infinite; margin: 0 auto 20px auto; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    .manual-link { color: #007BFF; text-decoration: underline; cursor: pointer; font-size: 14px; }
+    .btn-save { padding: 10px 20px; background: #00CCFF; color: white; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; margin-top: 10px; }
+    .input-url { padding: 10px; width: 80%; max-width: 400px; border: 1px solid #ccc; border-radius: 5px; margin-bottom: 10px; outline: none; }
 `;
 document.head.appendChild(style);
 
-document.querySelector('#app').innerHTML = `
-    <div style="display: flex; justify-content: center; align-items: center; height: 100vh; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; flex-direction: column; text-align: center; background-color: #ffffff; color: #333;">
-        <img src="${logo}" alt="Logo" style="width: 120px; margin-bottom: 30px;">
-        <div class="spinner"></div>
-        <h2 id="status" style="margin: 0 0 10px 0; font-weight: 500;">Menghubungkan ke Vines POS...</h2>
-        <p id="sub-status" style="color: #666; margin: 0;">Memuat antarmuka sistem</p>
-        
-        <div id="retry-area" style="margin-top: 30px; display: none; transition: opacity 0.5s;">
-            <p style="font-size: 13px; color: #888; margin-bottom: 5px;">Proses memakan waktu lebih lama dari biasanya.</p>
-            <span class="manual-link" onclick="window.location.href='${remoteURL}'">Muat Ulang Secara Manual</span>
+function showLoadingUI() {
+    document.querySelector('#app').innerHTML = `
+        <div style="display: flex; justify-content: center; align-items: center; height: 100vh; font-family: sans-serif; flex-direction: column; text-align: center;">
+            <img src="${logo}" style="width: 120px; margin-bottom: 30px;">
+            <div class="spinner"></div>
+            <h2>Menghubungkan ke Vines POS...</h2>
+            <div id="retry-area" style="margin-top: 30px; display: none;">
+                <span class="manual-link" id="btn-settings">Ubah Pengaturan URL</span>
+            </div>
         </div>
-    </div>
-`;
-
-// Pengecekan Update Native
-function doCheckUpdate() {
-    CheckUpdate().then(result => {
-        if (result.update_available) {
-            // Panggil fungsi Go untuk memunculkan Popup Native OS
-            ShowUpdatePrompt(result.latest_version, result.url);
-        }
-    }).catch(err => console.error("Update check failed:", err));
+    `;
+    document.getElementById('btn-settings').onclick = showSettingsUI;
 }
 
-// Jalankan pengecekan update
-doCheckUpdate();
+function showSettingsUI() {
+    document.querySelector('#app').innerHTML = `
+        <div style="display: flex; justify-content: center; align-items: center; height: 100vh; font-family: sans-serif; flex-direction: column; text-align: center; padding: 20px;">
+            <img src="${logo}" style="width: 80px; margin-bottom: 20px;">
+            <h3>Pengaturan Server POS</h3>
+            <p style="color: #666; font-size: 14px;">Masukkan alamat URL server (misal: http://1.2.3.4:888/path)</p>
+            <input type="text" id="url-input" class="input-url" placeholder="http://..." value="${currentConfig?.remote_url || ''}">
+            <button id="save-btn" class="btn-save">Simpan & Hubungkan</button>
+            ${currentConfig?.remote_url ? '<p><span class="manual-link" onclick="location.reload()">Batal</span></p>' : ''}
+        </div>
+    `;
+    document.getElementById('save-btn').onclick = () => {
+        const newURL = document.getElementById('url-input').value;
+        if (!newURL.startsWith('http')) {
+            alert('URL harus diawali dengan http:// atau https://');
+            return;
+        }
+        SaveURL(newURL).then(res => {
+            if (res === "Success") {
+                location.reload();
+            } else {
+                alert(res);
+            }
+        });
+    };
+}
 
-// Redirect otomatis
-setTimeout(() => {
-    setTimeout(() => {
-        const retry = document.getElementById('retry-area');
-        if(retry) retry.style.display = 'block';
-    }, 4000);
-    window.location.assign(remoteURL);
-}, 500);
+// Main Execution
+showLoadingUI();
+
+GetConfig().then(config => {
+    currentConfig = config;
+    
+    // 1. Cek Update di background
+    CheckUpdate().then(result => {
+        if (result.update_available) ShowUpdatePrompt(result.latest_version, result.url);
+    });
+
+    // 2. Logika Redirect
+    if (!config.remote_url) {
+        showSettingsUI();
+    } else {
+        setTimeout(() => {
+            // Munculkan opsi settings jika loading kelamaan
+            setTimeout(() => {
+                const retry = document.getElementById('retry-area');
+                if(retry) retry.style.display = 'block';
+            }, 4000);
+            window.location.assign(config.remote_url);
+        }, 500);
+    }
+});

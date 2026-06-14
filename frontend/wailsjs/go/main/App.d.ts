@@ -4,7 +4,11 @@ import {main} from '../models';
 
 export function CheckUpdate():Promise<Record<string, any>>;
 
+export function GetConfig():Promise<main.AppConfig>;
+
 export function PrintReceipt(arg1:main.PrinterLine):Promise<string>;
+
+export function SaveURL(arg1:string):Promise<string>;
 
 export function ShowUpdatePrompt(arg1:string,arg2:string):Promise<void>;
 

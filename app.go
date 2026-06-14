@@ -1,4 +1,5 @@
 package main
+
 import (
 	"bufio"
 	"context"
@@ -23,6 +24,21 @@ func NewApp(config AppConfig) *App {
 	return &App{
 		config: config,
 	}
+}
+
+// GetConfig mengembalikan konfigurasi saat ini ke frontend
+func (a *App) GetConfig() AppConfig {
+	return a.config
+}
+
+// SaveURL menyimpan URL baru ke dalam file config.json
+func (a *App) SaveURL(newURL string) string {
+	a.config.RemoteURL = newURL
+	err := a.config.Save()
+	if err != nil {
+		return "Error: " + err.Error()
+	}
+	return "Success"
 }
 
 // ShowUpdatePrompt memunculkan dialog native OS agar tidak hilang saat redirect web
@@ -53,7 +69,7 @@ func (a *App) CheckUpdate() map[string]interface{} {
 	client := &http.Client{Timeout: 5 * time.Second}
 	// Ganti dengan URL repo Anda
 	url := "https://api.github.com/repos/MuhammadSuryono/vines-post-desktop/releases/latest"
-	
+
 	resp, err := client.Get(url)
 	if err != nil {
 		return map[string]interface{}{"update_available": false, "error": err.Error()}
@@ -71,7 +87,7 @@ func (a *App) CheckUpdate() map[string]interface{} {
 
 	// Bandingkan: Jika Tag di GitHub (misal v1.0.1) != Versi Lokal
 	updateAvailable := release.TagName != "v"+a.config.Version && release.TagName != a.config.Version
-	
+
 	return map[string]interface{}{
 		"update_available": updateAvailable,
 		"latest_version":   release.TagName,
@@ -142,7 +158,7 @@ func (a *App) executePrint(printerLine PrinterLine) error {
 	printerName := printerLine.PrinterName
 	// Path untuk Windows printer sharing
 	path := "\\\\" + name + "\\" + printerName
-	
+
 	socket, errSocket := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0777)
 	if errSocket != nil {
 		return errSocket
@@ -154,9 +170,9 @@ func (a *App) executePrint(printerLine PrinterLine) error {
 
 	p.Verbose = true
 	p.Init()
-	
+
 	a.setHeaderNota(p, printerLine)
-	
+
 	// Tambahkan logika item jika diperlukan (opsional, disesuaikan dengan main.go lama)
 	for _, v := range printerLine.ItemLine {
 		p.SetEmphasize(1)
@@ -168,7 +184,7 @@ func (a *App) executePrint(printerLine PrinterLine) error {
 
 	// Buka laci kasir (Cash Drawer)
 	p.Pulse()
-	
+
 	// Potong kertas
 	p.Cut()
 	w.Flush()

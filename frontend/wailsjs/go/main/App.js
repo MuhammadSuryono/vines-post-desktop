@@ -6,8 +6,16 @@ export function CheckUpdate() {
   return window['go']['main']['App']['CheckUpdate']();
 }
 
+export function GetConfig() {
+  return window['go']['main']['App']['GetConfig']();
+}
+
 export function PrintReceipt(arg1) {
   return window['go']['main']['App']['PrintReceipt'](arg1);
+}
+
+export function SaveURL(arg1) {
+  return window['go']['main']['App']['SaveURL'](arg1);
 }
 
 export function ShowUpdatePrompt(arg1, arg2) {
