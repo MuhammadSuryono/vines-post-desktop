@@ -7,9 +7,13 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"os/exec"
+	stdruntime "runtime"
+	"strings"
 	"time"
 	"vines-pos-desktop/printer"
 
+	"github.com/minio/selfupdate"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
@@ -42,8 +46,8 @@ func (a *App) SaveURL(newURL string) string {
 }
 
 // ShowUpdatePrompt memunculkan dialog native OS agar tidak hilang saat redirect web
-func (a *App) ShowUpdatePrompt(version string, url string) {
-	msg := fmt.Sprintf("Versi baru (%s) telah tersedia.\nApakah Anda ingin mendownloadnya sekarang?", version)
+func (a *App) ShowUpdatePrompt(version string, release GitHubRelease) {
+	msg := fmt.Sprintf("Versi baru (%s) telah tersedia.\nApakah Anda ingin mendownload dan menginstallnya secara otomatis?", version)
 
 	result, err := runtime.MessageDialog(a.ctx, runtime.MessageDialogOptions{
 		Type:          runtime.QuestionDialog,
@@ -55,14 +59,93 @@ func (a *App) ShowUpdatePrompt(version string, url string) {
 	})
 
 	if err == nil && result == "Yes" {
-		runtime.BrowserOpenURL(a.ctx, url)
+		go a.StartUpdate(release)
 	}
 }
 
+// StartUpdate mendownload dan menerapkan update secara otomatis
+func (a *App) StartUpdate(release GitHubRelease) {
+	// 1. Cari asset yang sesuai dengan OS dan Arch
+	var downloadURL string
+	osName := stdruntime.GOOS
+	archName := stdruntime.GOARCH
+
+	for _, asset := range release.Assets {
+		name := strings.ToLower(asset.Name)
+		// Cari yang cocok dengan OS (windows/darwin) dan Arch (amd64/arm64)
+		if strings.Contains(name, osName) && strings.Contains(name, archName) {
+			downloadURL = asset.BrowserDownloadURL
+			break
+		}
+		// Fallback sederhana jika penamaan tidak menyertakan arch
+		if strings.Contains(name, osName) && downloadURL == "" {
+			if osName == "windows" && strings.HasSuffix(name, ".exe") {
+				downloadURL = asset.BrowserDownloadURL
+			} else if osName == "darwin" && !strings.HasSuffix(name, ".exe") {
+				downloadURL = asset.BrowserDownloadURL
+			}
+		}
+	}
+
+	if downloadURL == "" {
+		runtime.MessageDialog(a.ctx, runtime.MessageDialogOptions{
+			Type:    runtime.ErrorDialog,
+			Title:   "Update Gagal",
+			Message: "Tidak dapat menemukan file update yang sesuai untuk sistem Anda.",
+		})
+		return
+	}
+
+	// 2. Download asset
+	resp, err := http.Get(downloadURL)
+	if err != nil {
+		runtime.MessageDialog(a.ctx, runtime.MessageDialogOptions{
+			Type:    runtime.ErrorDialog,
+			Title:   "Download Gagal",
+			Message: "Gagal mendownload update: " + err.Error(),
+		})
+		return
+	}
+	defer resp.Body.Close()
+
+	// 3. Terapkan update
+	err = selfupdate.Apply(resp.Body, selfupdate.Options{})
+	if err != nil {
+		runtime.MessageDialog(a.ctx, runtime.MessageDialogOptions{
+			Type:    runtime.ErrorDialog,
+			Title:   "Install Gagal",
+			Message: "Gagal menerapkan update: " + err.Error(),
+		})
+		return
+	}
+
+	// 4. Restart aplikasi
+	runtime.MessageDialog(a.ctx, runtime.MessageDialogOptions{
+		Type:    runtime.InfoDialog,
+		Title:   "Update Berhasil",
+		Message: "Update telah terpasang. Aplikasi akan dimulai ulang sekarang.",
+	})
+
+	self, err := os.Executable()
+	if err == nil {
+		cmd := exec.Command(self)
+		cmd.Start()
+		os.Exit(0)
+	} else {
+		runtime.Quit(a.ctx)
+	}
+}
+
+type GitHubAsset struct {
+	Name               string `json:"name"`
+	BrowserDownloadURL string `json:"browser_download_url"`
+}
+
 type GitHubRelease struct {
-	TagName string `json:"tag_name"`
-	Name    string `json:"name"`
-	HTMLURL string `json:"html_url"`
+	TagName string        `json:"tag_name"`
+	Name    string        `json:"name"`
+	HTMLURL string        `json:"html_url"`
+	Assets  []GitHubAsset `json:"assets"`
 }
 
 // CheckUpdate membandingkan versi lokal dengan rilis terbaru di GitHub
@@ -94,6 +177,7 @@ func (a *App) CheckUpdate() map[string]interface{} {
 		"latest_version":   release.TagName,
 		"current_version":  a.config.Version,
 		"url":              release.HTMLURL,
+		"release":          release,
 	}
 }
 

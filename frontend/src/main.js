@@ -91,7 +91,7 @@ GetConfig().then(config => {
 
     // 1. Cek Update di background
     CheckUpdate().then(result => {
-        if (result.update_available) ShowUpdatePrompt(result.latest_version, result.url);
+        if (result.update_available) ShowUpdatePrompt(result.latest_version, result.release);
     });
 
     // 2. Logika Redirect

@@ -84,7 +84,10 @@ func main() {
 	AppSubMenu.AddText("Cek Pembaruan", nil, func(_ *menu.CallbackData) {
 		result := app.CheckUpdate()
 		if val, ok := result["update_available"].(bool); ok && val {
-			app.ShowUpdatePrompt(result["latest_version"].(string), result["url"].(string))
+			// Pastikan casting ke tipe yang benar
+			if release, ok := result["release"].(GitHubRelease); ok {
+				app.ShowUpdatePrompt(result["latest_version"].(string), release)
+			}
 		} else {
 			runtime.MessageDialog(app.ctx, runtime.MessageDialogOptions{
 				Type:    runtime.InfoDialog,
