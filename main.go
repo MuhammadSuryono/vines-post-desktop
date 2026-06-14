@@ -62,8 +62,11 @@ func main() {
 	// Menu Pengaturan
 	SettingsMenu := AppMenu.AddSubmenu("Pengaturan")
 	SettingsMenu.AddText("Ubah URL Server", keys.CmdOrCtrl("u"), func(_ *menu.CallbackData) {
-		// Panggil fungsi global di frontend untuk menampilkan modal/halaman settings
-		runtime.WindowExecJS(app.ctx, "if(window.showSettingsUI) { window.showSettingsUI(); } else { window.location.href = '/'; }")
+		// 1. Kosongkan URL di memori dan file config.json
+		app.config.RemoteURL = ""
+		app.config.Save()
+		// 2. Restart/Reload aplikasi agar kembali ke halaman input awal
+		runtime.WindowReload(app.ctx)
 	})
 
 	// Menu Aplikasi
