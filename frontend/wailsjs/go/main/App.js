@@ -29,3 +29,7 @@ export function StartUpdate(arg1) {
 export function TestPrint(arg1) {
   return window['go']['main']['App']['TestPrint'](arg1);
 }
+
+export function TestSampleReceipt() {
+  return window['go']['main']['App']['TestSampleReceipt']();
+}

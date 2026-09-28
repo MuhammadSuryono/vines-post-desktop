@@ -2,25 +2,35 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
 	stdruntime "runtime"
 	"strings"
+	"sync"
 	"time"
 	"vines-pos-desktop/printer"
 
 	"github.com/minio/selfupdate"
+	"github.com/wailsapp/wails/v2/pkg/menu"
 	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
 // App struct
 type App struct {
-	ctx    context.Context
-	config *AppConfig
+	ctx           context.Context
+	config        *AppConfig
+	printInternal *menu.MenuItem
+	printPlugin   *menu.MenuItem
+	printMu       sync.Mutex
+	printServers  []*http.Server
 }
 
 // NewApp creates a new App application struct
@@ -189,6 +199,154 @@ func (a *App) CheckUpdate() map[string]interface{} {
 // so we can call the runtime methods
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	if a.config.PrintMode != "plugin" {
+		if err := a.startPrintServer(); err != nil {
+			log.Printf("print agent: %v", err)
+		}
+	}
+}
+
+func (a *App) printMux() http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("/api/v1/print", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		if r.Method != http.MethodPost {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		var data PrinterLine
+		if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]string{"status": a.PrintReceipt(data)})
+	})
+	return mux
+}
+
+func (a *App) startPrintServer() error {
+	a.printMu.Lock()
+	defer a.printMu.Unlock()
+	if len(a.printServers) > 0 {
+		return nil
+	}
+
+	mux := a.printMux()
+	var started []*http.Server
+	for _, addr := range []string{"127.0.0.1:7081", "[::1]:7081"} {
+		ln, err := net.Listen("tcp", addr)
+		if err != nil {
+			for _, srv := range started {
+				_ = srv.Close()
+			}
+			return fmt.Errorf("port 7081 di %s sedang dipakai", addr)
+		}
+		srv := &http.Server{Handler: mux}
+		started = append(started, srv)
+		go func(srv *http.Server, ln net.Listener) {
+			if err := srv.Serve(ln); err != nil && err != http.ErrServerClosed {
+				log.Printf("print agent: %v", err)
+			}
+		}(srv, ln)
+		log.Printf("print agent listening on %s", addr)
+	}
+	a.printServers = started
+	return nil
+}
+
+func (a *App) stopPrintServer() {
+	a.printMu.Lock()
+	servers := a.printServers
+	a.printServers = nil
+	a.printMu.Unlock()
+	for _, srv := range servers {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		_ = srv.Shutdown(ctx)
+		cancel()
+	}
+}
+
+func (a *App) usePrintMode(mode string) {
+	if mode != "plugin" {
+		mode = "internal"
+	}
+	if mode == "plugin" {
+		a.stopPrintServer()
+	} else if err := a.startPrintServer(); err != nil {
+		a.syncPrintMenu()
+		_, _ = runtime.MessageDialog(a.ctx, runtime.MessageDialogOptions{
+			Type:    runtime.ErrorDialog,
+			Title:   "Cetak internal",
+			Message: err.Error() + "\nMatikan printer-plugin dulu, lalu pilih internal lagi.",
+		})
+		return
+	}
+	a.config.PrintMode = mode
+	_ = a.config.Save()
+	a.syncPrintMenu()
+
+	msg := "Cetak lewat desktop. Port 7081 dipegang aplikasi ini."
+	if mode == "plugin" {
+		msg = "Cetak lewat plugin. Port 7081 sudah dilepas.\nJalankan printer-plugin, lalu pakai Test cetak."
+	}
+	_, _ = runtime.MessageDialog(a.ctx, runtime.MessageDialogOptions{
+		Type:    runtime.InfoDialog,
+		Title:   "Pengaturan cetak",
+		Message: msg,
+	})
+}
+
+func (a *App) syncPrintMenu() {
+	internal := a.config.PrintMode != "plugin"
+	if a.printInternal != nil {
+		a.printInternal.SetChecked(internal)
+	}
+	if a.printPlugin != nil {
+		a.printPlugin.SetChecked(!internal)
+	}
+	if a.ctx != nil {
+		runtime.MenuUpdateApplicationMenu(a.ctx)
+	}
+}
+
+func (a *App) TestSampleReceipt() {
+	client := &http.Client{Timeout: 20 * time.Second}
+	req, err := http.NewRequest(http.MethodPost, "http://127.0.0.1:7081/api/v1/print?action=print", bytes.NewReader(sampleReceiptBody))
+	if err != nil {
+		a.alertPrint(runtime.ErrorDialog, err.Error())
+		return
+	}
+	req.Header.Set("Content-Type", "application/json; charset=utf-8")
+	resp, err := client.Do(req)
+	if err != nil {
+		a.alertPrint(runtime.ErrorDialog, "Tidak ada yang menjawab di port 7081.\n"+err.Error())
+		return
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+	kind := runtime.InfoDialog
+	if resp.StatusCode >= 400 {
+		kind = runtime.ErrorDialog
+	}
+	a.alertPrint(kind, fmt.Sprintf("HTTP %d\n%s", resp.StatusCode, strings.TrimSpace(string(body))))
+}
+
+func (a *App) alertPrint(kind runtime.DialogType, message string) {
+	_, _ = runtime.MessageDialog(a.ctx, runtime.MessageDialogOptions{
+		Type:    kind,
+		Title:   "Test cetak",
+		Message: message,
+	})
 }
 
 // domReady is called when the frontend has loaded its initial assets
@@ -201,16 +359,57 @@ func (a *App) domReady(ctx context.Context) {
 type PrinterLine struct {
 	HeaderLine      HeaderLine `json:"header_line"`
 	DescriptionLine struct {
-		Data    map[string]string `json:"data"`
-		UseDash bool              `json:"use_dash"`
+		Data    receiptFields `json:"data"`
+		UseDash bool          `json:"use_dash"`
 	} `json:"description_line"`
 	ItemLine []ItemLine `json:"item_line"`
 	Others   []struct {
-		Data    map[string]string `json:"data"`
-		UseDash bool              `json:"use_dash"`
+		Data    receiptFields `json:"data"`
+		UseDash bool          `json:"use_dash"`
 	} `json:"others"`
 	Notes       string `json:"notes"`
 	PrinterName string `json:"printer_name"`
+}
+
+// receiptFields keeps JSON object key order so the slip matches the payload.
+type receiptFields []receiptField
+
+type receiptField struct {
+	Key   string
+	Value string
+}
+
+func (f *receiptFields) UnmarshalJSON(data []byte) error {
+	if string(data) == "null" {
+		return nil
+	}
+	dec := json.NewDecoder(bytes.NewReader(data))
+	tok, err := dec.Token()
+	if err != nil {
+		return err
+	}
+	delim, ok := tok.(json.Delim)
+	if !ok || delim != '{' {
+		return fmt.Errorf("receipt fields: expected object")
+	}
+	for dec.More() {
+		keyTok, err := dec.Token()
+		if err != nil {
+			return err
+		}
+		key, ok := keyTok.(string)
+		if !ok {
+			return fmt.Errorf("receipt fields: expected string key")
+		}
+		var raw json.RawMessage
+		if err := dec.Decode(&raw); err != nil {
+			return err
+		}
+		val := strings.Trim(string(raw), `"`)
+		*f = append(*f, receiptField{Key: key, Value: val})
+	}
+	_, err = dec.Token()
+	return err
 }
 
 type HeaderLine struct {
@@ -239,18 +438,9 @@ func (a *App) PrintReceipt(data PrinterLine) string {
 }
 
 func (a *App) executePrint(printerLine PrinterLine) error {
-	name, err := os.Hostname()
+	socket, err := openPrinter(printerLine.PrinterName)
 	if err != nil {
 		return err
-	}
-
-	printerName := printerLine.PrinterName
-	// Path untuk Windows printer sharing
-	path := "\\\\" + name + "\\" + printerName
-
-	socket, errSocket := os.OpenFile(path, os.O_WRONLY|os.O_CREATE, 0777)
-	if errSocket != nil {
-		return errSocket
 	}
 	defer socket.Close()
 
@@ -261,8 +451,13 @@ func (a *App) executePrint(printerLine PrinterLine) error {
 	p.Init()
 
 	a.setHeaderNota(p, printerLine)
+	p.SetAlign("left")
 
-	// Tambahkan logika item jika diperlukan (opsional, disesuaikan dengan main.go lama)
+	writeFields(p, printerLine.DescriptionLine.Data)
+	if printerLine.DescriptionLine.UseDash && len(printerLine.DescriptionLine.Data) > 0 {
+		p.DashLine()
+	}
+
 	for _, v := range printerLine.ItemLine {
 		p.SetEmphasize(1)
 		p.Write(v.ItemName + "\n")
@@ -271,20 +466,52 @@ func (a *App) executePrint(printerLine PrinterLine) error {
 		p.NewLine()
 	}
 
-	// Buka laci kasir (Cash Drawer)
+	for _, block := range printerLine.Others {
+		writeFields(p, block.Data)
+		if block.UseDash && len(block.Data) > 0 {
+			p.DashLine()
+		}
+	}
+
+	if strings.TrimSpace(printerLine.Notes) != "" {
+		p.Write(printerLine.Notes)
+		if !strings.HasSuffix(printerLine.Notes, "\n") {
+			p.Write("\n")
+		}
+	}
+
 	p.Pulse()
-
-	// Potong kertas
 	p.Cut()
-	w.Flush()
+	p.Write("\n\n\n")
+	return w.Flush()
+}
 
-	return nil
+func writeFields(p *printer.Printer, fields receiptFields) {
+	const width = 32
+	for _, field := range fields {
+		key, val := field.Key, field.Value
+		if val == "" {
+			p.Write(key + "\n")
+			continue
+		}
+		if len(key)+1+len(val) > width {
+			p.Write(key + "\n")
+			if len(val) >= width {
+				p.Write(val + "\n")
+			} else {
+				p.Write(strings.Repeat(" ", width-len(val)) + val + "\n")
+			}
+			continue
+		}
+		p.Write(key + strings.Repeat(" ", width-len(key)-len(val)) + val + "\n")
+	}
 }
 
 func (a *App) setHeaderNota(p *printer.Printer, printerLine PrinterLine) {
-	p.SetFontSize(2, 3)
 	p.SetAlign("center")
 	p.SetFont("A")
+	// 2x2, bukan 2x3. Tinggi 3 kali dibuang oleh firmware 58 mm seperti EcoPrint.
+	p.SetFontSize(2, 2)
 	p.Write(printerLine.HeaderLine.Header)
 	p.NewLine()
 	p.SetFontSize(1, 1)
@@ -312,8 +539,7 @@ func (a *App) setHeaderNota(p *printer.Printer, printerLine PrinterLine) {
 
 // TestPrint untuk ngetes printer dari UI
 func (a *App) TestPrint(printerName string) string {
-	name, _ := os.Hostname()
-	socket, errSocket := os.OpenFile("\\\\"+name+"\\"+printerName, os.O_WRONLY|os.O_CREATE, 0)
+	socket, errSocket := openPrinter(printerName)
 	if errSocket != nil {
 		return errSocket.Error()
 	}

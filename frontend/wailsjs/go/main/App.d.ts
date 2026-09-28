@@ -15,3 +15,5 @@ export function ShowUpdatePrompt(arg1:string,arg2:main.GitHubRelease):Promise<vo
 export function StartUpdate(arg1:main.GitHubRelease):Promise<void>;
 
 export function TestPrint(arg1:string):Promise<string>;
+
+export function TestSampleReceipt():Promise<void>;

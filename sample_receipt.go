@@ -1,0 +1,4 @@
+package main
+
+// Body yang sama dengan curl uji dari kasir.
+var sampleReceiptBody = []byte(`{"header_line":{"header":"THE VINES","address":"EMPORIUM PLUIT MALL LT.4","city":"JAKARTA","portal_code":"","use_dash":true},"description_line":{"data":{"21-09-2026":"00:00:00","ORDER ID":"DNOTA01-2609-00009","Collection By":"THE VINES EMPORIUM PLUIT MALL"},"use_dash":true},"item_line":[{"item_name":"PENFOLDS CLUB TAWNY 750 ML","total_unit":"1","price":"450.000","total_price":"450.000"}],"others":[{"data":{"Subtotal":"450.000","Diskon":"0"},"use_dash":true},{"data":{"Total":"450.000","kembalian":"0","CREDIT - CC-OTHER":"450.000"},"use_dash":true}],"printer_name":"RPP02N","notes":"Barang yang sudah dibeli tidak dapat ditukar/dikembalikan\nHOTLINE Delivery 0878-8338-1818\nHarga sudah termasuk pajak"}`)

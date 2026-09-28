@@ -23,6 +23,7 @@ type AppConfig struct {
 	Mode      string `json:"mode"`       // "remote" atau "local"
 	RemoteURL string `json:"remote_url"` // URL jika mode = "remote"
 	Version   string `json:"version"`    // Versi aplikasi desktop
+	PrintMode string `json:"print_mode"` // "internal" atau "plugin"
 }
 
 func getConfigPath() string {
@@ -35,12 +36,16 @@ func loadConfig() AppConfig {
 	config := AppConfig{
 		Mode:      "remote",
 		RemoteURL: "", // Dikosongkan agar user diminta input pertama kali
-		Version:   "1.0.0",
+		Version:   "1.0.5",
+		PrintMode: "internal",
 	}
 
 	data, err := os.ReadFile(getConfigPath())
 	if err == nil {
 		json.Unmarshal(data, &config)
+	}
+	if config.PrintMode != "plugin" {
+		config.PrintMode = "internal"
 	}
 	return config
 }
@@ -60,9 +65,21 @@ func main() {
 
 	// Membuat Menu Bar Desktop Native
 	AppMenu := menu.NewMenu()
+	// Tanpa menu Edit, WKWebView di macOS tidak menerima Cmd+C / Cmd+V.
+	AppMenu.Append(menu.EditMenu())
 
 	// Menu Pengaturan
 	SettingsMenu := AppMenu.AddSubmenu("Pengaturan")
+	app.printInternal = SettingsMenu.AddRadio("Cetak internal (desktop)", config.PrintMode != "plugin", nil, func(_ *menu.CallbackData) {
+		app.usePrintMode("internal")
+	})
+	app.printPlugin = SettingsMenu.AddRadio("Cetak lewat plugin", config.PrintMode == "plugin", nil, func(_ *menu.CallbackData) {
+		app.usePrintMode("plugin")
+	})
+	SettingsMenu.AddSeparator()
+	SettingsMenu.AddText("Test cetak", nil, func(_ *menu.CallbackData) {
+		app.TestSampleReceipt()
+	})
 	SettingsMenu.AddText("Ubah URL Server", keys.CmdOrCtrl("u"), func(_ *menu.CallbackData) {
 		// 1. Kosongkan URL di memori
 		app.config.RemoteURL = ""
